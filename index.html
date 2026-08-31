@@ -211,10 +211,16 @@ const ADMIN_PASSWORD = '778899';
 let remoteReady=false;
 let syncing=false;
 
-function supaHeaders(){return {'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json','Prefer':'return=minimal'}}
+function supaHeaders(options={}){
+ const h={'apikey':SUPABASE_ANON_KEY,'Accept':'application/json'};
+ if(options.body) h['Content-Type']='application/json';
+ if(options.prefer) h['Prefer']=options.prefer;
+ return h;
+}
 async function remoteRequest(path,options={}){
- if(!SUPABASE_ANON_KEY) throw new Error('Chave anon do Supabase não configurada.');
- const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{...options,headers:{...supaHeaders(),...(options.headers||{})}});
+ if(!SUPABASE_ANON_KEY) throw new Error('Chave Publishable do Supabase não configurada.');
+ const req={...options,headers:{...supaHeaders(options),...(options.headers||{})}};
+ const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,req);
  if(!r.ok){const txt=await r.text();throw new Error(txt||('HTTP '+r.status));}
  return r;
 }
@@ -245,8 +251,8 @@ async function save(){
    const existingMoves=await (await remoteRequest('emprestimos?select=id')).json();
    if(existingTools.length) await remoteRequest('ferramentas?id=in.('+existingTools.map(x=>x.id).join(',')+')',{method:'DELETE'});
    if(existingMoves.length) await remoteRequest('emprestimos?id=in.('+existingMoves.map(x=>x.id).join(',')+')',{method:'DELETE'});
-   if(db.tools.length) await remoteRequest('ferramentas',{method:'POST',body:JSON.stringify(db.tools.map(t=>({id:t.id,nome:t.name,tag:t.tag,localizacao:t.location||'Ferramentaria',status:t.status||'disponivel',foto:t.foto||''})))});
-   if(db.moves.length) await remoteRequest('emprestimos',{method:'POST',body:JSON.stringify(db.moves.map(m=>({id:m.id,tag:m.tag,tool_name:m.toolName,nome:m.nome,local:m.local||'',checkout_at:m.checkoutAt,returned_at:m.returnedAt||null,returned_by:m.returnedBy||''})))});
+   if(db.tools.length) await remoteRequest('ferramentas',{method:'POST',prefer:'return=minimal',body:JSON.stringify(db.tools.map(t=>({id:t.id,nome:t.name,tag:t.tag,localizacao:t.location||'Ferramentaria',status:t.status||'disponivel',foto:t.foto||''})))});
+   if(db.moves.length) await remoteRequest('emprestimos',{method:'POST',prefer:'return=minimal',body:JSON.stringify(db.moves.map(m=>({id:m.id,tag:m.tag,tool_name:m.toolName,nome:m.nome,local:m.local||'',checkout_at:m.checkoutAt,returned_at:m.returnedAt||null,returned_by:m.returnedBy||''})))});
    remoteReady=true;
  }catch(err){console.error(err);remoteReady=false;alert('Alteração salva neste computador, mas não foi possível sincronizar com o banco remoto.\n\n'+(err.message||err));}
  finally{syncing=false;}
